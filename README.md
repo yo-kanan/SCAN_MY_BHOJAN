@@ -122,4 +122,4 @@ If you like this project, don't forget to **Star ⭐ the repository**.
 
 ## 👨‍💻 Developer
 
-Made with ❤️ by **Ajay Kumar**
+ **KANAN**
