@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ScanMyBhojan - System Initialization</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Rajdhani:wght@300;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <!-- Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- GSAP -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #050505;
+            color: #e0e0e0;
+            font-family: 'Rajdhani', sans-serif;
+            user-select: none;
+        }
+
+        #canvas-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        /* Sci-Fi Background Grid */
+        .hex-grid {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                linear-gradient(rgba(0, 255, 204, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 255, 204, 0.03) 1px, transparent 1px);
+            background-size: 40px 40px;
+            z-index: 2;
+            pointer-events: none;
+        }
+        
+        .vignette {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle, transparent 40%, rgba(0,0,0,0.8) 100%);
+            z-index: 3;
+            pointer-events: none;
+        }
+
+        .ui-layer {
+            position: absolute;
+            z-index: 20;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 30px;
+            box-sizing: border-box;
+        }
+
+        /* Glassmorphism & Borders */
+        .glass-panel {
+            background: rgba(10, 15, 20, 0.65);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(0, 255, 204, 0.15);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Moving Shimmer Effect on Panels */
+        .glass-panel::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -150%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.05), transparent);
+            transform: skewX(-20deg);
+            animation: shimmer 6s infinite linear;
+            pointer-events: none;
+        }
+
+        @keyframes shimmer {
+            0% { left: -150%; }
+            50% { left: 150%; }
+            100% { left: 150%; }
+        }
+
+        /* Corner Decorations */
+        .corner-deco {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            border: 2px solid #00ffcc;
+            transition: all 0.3s ease;
+        }
+        .top-left { top: 0; left: 0; border-right: none; border-bottom: none; }
+        .top-right { top: 0; right: 0; border-left: none; border-bottom: none; }
+        .bottom-left { bottom: 0; left: 0; border-right: none; border-top: none; }
+        .bottom-right { bottom: 0; right: 0; border-left: none; border-top: none; }
+
+        .title-glitch {
+            font-family: 'Orbitron', sans-serif;
+            font-weight: 900;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            color: #fff;
+            text-shadow: 0 0 10px rgba(0, 255, 204, 0.7);
+        }
+
+        /* Radar Animation */
+        .radar-container {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            border: 1px solid rgba(0, 255, 204, 0.3);
+            position: relative;
+            background: rgba(0, 20, 10, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .radar-sweep {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background: conic-gradient(from 0deg, transparent 0deg, rgba(0, 255, 204, 0.4) 360deg);
+            animation: radar-spin 2s linear infinite;
+        }
+
+        .radar-dot {
+            width: 4px;
+            height: 4px;
+            background: #ff0055;
+            border-radius: 50%;
+            position: absolute;
+            top: 20px;
+            left: 50px;
+            box-shadow: 0 0 5px #ff0055;
+            animation: blink 1s infinite;
+        }
+
+        @keyframes radar-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+
+        /* Progress Bar */
+        .progress-container {
+            width: 100%;
+            height: 6px;
+            background: rgba(0,0,0,0.5);
+            margin-top: 15px;
+            position: relative;
+            border-radius: 2px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #00ffcc, #00aaff);
+            width: 0%;
+            position: relative;
+            box-shadow: 0 0 15px rgba(0, 255, 204, 0.5);
+        }
+        
+        .progress-head {
+            position: absolute;
+            right: 0;
+            top: -4px;
+            height: 14px;
+            width: 4px;
+            background: #fff;
+            box-shadow: 0 0 10px #fff;
+        }
+
+        /* CRT Scanline */
+        .scan-line {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(to bottom, transparent 50%, rgba(0, 255, 204, 0.03) 51%, transparent 51%);
+            background-size: 100% 3px;
+            pointer-events: none;
+            z-index: 30;
+        }
+
+        .system-status-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background-color: #00ffcc;
+            box-shadow: 0 0 8px #00ffcc;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Overlay Effects -->
+    <div class="hex-grid"></div>
+    <div class="vignette"></div>
+    <div class="scan-line"></div>
+
+    <!-- 3D Scene -->
+    <div id="canvas-container"></div>
+
+    <!-- UI Layer -->
+    <div class="ui-layer">
+        
+        <!-- Header Section -->
+        <div class="flex justify-between items-start w-full">
+            <!-- Title & Version -->
+            <div class="relative pl-4">
+                <div class="absolute left-0 top-0 h-full w-1 bg-cyan-400 shadow-[0_0_10px_#00ffcc]"></div>
+                <h1 class="text-5xl title-glitch leading-none">ScanMyBhojan</h1>
+                <div class="flex items-center gap-3 mt-2">
+                    <span class="bg-cyan-900/40 border border-cyan-500/30 px-2 py-0.5 rounded text-xs text-cyan-400 font-mono tracking-wider">V.2.4.0 BETA</span>
+                    <span class="text-xs text-gray-400 font-mono tracking-[0.2em]">SECURE ENVIRONMENT</span>
+                </div>
+            </div>
+
+            <!-- Server Status Panel -->
+            <div class="glass-panel p-3 rounded-md flex gap-6 items-center">
+                <div class="corner-deco top-left"></div>
+                <div class="corner-deco bottom-right"></div>
+                
+                <div class="flex flex-col gap-1">
+                    <div class="flex items-center justify-between w-32">
+                        <span class="text-[10px] text-gray-400 uppercase font-bold tracking-wider">AI Core</span>
+                        <div class="system-status-dot animate-pulse"></div>
+                    </div>
+                    <div class="flex items-center justify-between w-32">
+                        <span class="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Database</span>
+                        <div class="system-status-dot"></div>
+                    </div>
+                    <div class="flex items-center justify-between w-32">
+                        <span class="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Neural Net</span>
+                        <div class="system-status-dot"></div>
+                    </div>
+                </div>
+                
+                <!-- Radar Visual -->
+                <div class="radar-container ml-2">
+                    <div class="radar-sweep"></div>
+                    <div class="radar-dot"></div>
+                    <!-- Lucide Icon in Center -->
+                    <i data-lucide="scan-line" class="relative z-10 w-5 h-5 text-cyan-400 opacity-80"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Middle Spacer -->
+        <div class="flex-grow"></div>
+
+        <!-- Footer Section -->
+        <div class="flex flex-col md:flex-row gap-4 items-stretch h-48">
+            
+            <!-- Terminal / Logs -->
+            <div class="glass-panel w-full md:w-1/3 rounded-lg flex flex-col p-4">
+                <div class="flex justify-between items-center mb-2 border-b border-gray-700/50 pb-1">
+                    <span class="text-xs text-cyan-500 font-bold uppercase tracking-widest flex items-center gap-2">
+                        <i data-lucide="terminal" class="w-3 h-3"></i> System Log
+                    </span>
+                    <span class="text-[10px] text-gray-500 font-mono">/var/log/boot</span>
+                </div>
+                <div id="terminal-log" class="font-mono text-xs text-gray-300 space-y-1.5 overflow-hidden flex-col flex justify-end h-full">
+                    <!-- JS injects here -->
+                </div>
+            </div>
+
+            <!-- Main Loader & Stats -->
+            <div class="glass-panel w-full md:w-2/3 rounded-lg p-5 flex flex-col justify-between relative">
+                <!-- Decorative Borders -->
+                <div class="corner-deco top-right"></div>
+                <div class="corner-deco bottom-left"></div>
+
+                <div class="flex justify-between items-start">
+                    <div class="flex flex-col">
+                        <span class="text-xs text-purple-400 font-bold uppercase tracking-[0.2em] mb-1">Current Process</span>
+                        <h2 id="loading-text" class="text-3xl font-bold text-white tracking-wide">INITIALIZING KERNEL...</h2>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-5xl font-bold font-share-tech-mono text-cyan-400 leading-none">
+                            <span id="percentage">0</span><span class="text-2xl text-cyan-700">%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Frequency Visualizer -->
+                <canvas id="chart-canvas" class="w-full h-12 mt-2 opacity-80"></canvas>
+
+                <!-- Progress Bar -->
+                <div>
+                    <div class="progress-container">
+                        <div id="main-progress" class="progress-bar">
+                            <div class="progress-head"></div>
+                        </div>
+                    </div>
+                    <div class="flex justify-between mt-2 text-[10px] text-gray-500 font-mono uppercase">
+                        <span>Memory: <span class="text-cyan-300">Allocated</span></span>
+                        <span>Security: <span class="text-green-400">Enforced</span></span>
+                        <span id="uid-hash">ID: 8X-992-ALPHA</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Access Granted Overlay (Hidden initially) -->
+    <div id="access-overlay" class="absolute inset-0 bg-green-500/10 z-50 pointer-events-none flex items-center justify-center opacity-0 scale-95">
+        <div class="border-2 border-green-500 bg-black/80 px-10 py-6 text-center backdrop-blur-md">
+            <h1 class="text-4xl text-green-500 font-bold tracking-widest uppercase">Access Granted</h1>
+            <p class="text-green-300 font-mono mt-2">Loading User Interface...</p>
+        </div>
+    </div>
+
+    <script>
+        // --- ICONS ---
+        lucide.createIcons();
+
+        // --- CONFIG ---
+        const LOADING_DURATION = 6000;
+        const NEXT_PAGE = 'index.html';
+
+        // --- THREE.JS SCENE ---
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x050505, 0.0015);
+
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.z = 25;
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        container.appendChild(renderer.domElement);
+
+        // --- OBJECTS ---
+        
+        // 1. Core DNA (TorusKnot)
+        const geometry = new THREE.TorusKnotGeometry(8, 2.5, 120, 20);
+        const material = new THREE.PointsMaterial({
+            color: 0x00ffcc,
+            size: 0.12,
+            transparent: true,
+            opacity: 0.9,
+            blending: THREE.AdditiveBlending
+        });
+        const torusKnot = new THREE.Points(geometry, material);
+        scene.add(torusKnot);
+
+        // 2. Orbital Ring (New)
+        const ringGeo = new THREE.TorusGeometry(16, 0.2, 16, 100);
+        const ringMat = new THREE.MeshBasicMaterial({ 
+            color: 0x8800ff, 
+            wireframe: true, 
+            transparent: true, 
+            opacity: 0.3 
+        });
+        const orbitalRing = new THREE.Mesh(ringGeo, ringMat);
+        orbitalRing.rotation.x = Math.PI / 2;
+        scene.add(orbitalRing);
+
+        // 3. Particle Field (Scanner Data)
+        const pGeo = new THREE.BufferGeometry();
+        const pCount = 3000;
+        const pPos = new Float32Array(pCount * 3);
+        const pSizes = new Float32Array(pCount);
+
+        for(let i=0; i<pCount*3; i+=3) {
+            pPos[i] = (Math.random() - 0.5) * 100;   // x
+            pPos[i+1] = (Math.random() - 0.5) * 100; // y
+            pPos[i+2] = (Math.random() - 0.5) * 80;  // z
+            pSizes[i/3] = Math.random();
+        }
+
+        pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
+        pGeo.setAttribute('size', new THREE.BufferAttribute(pSizes, 1));
+
+        const pMat = new THREE.PointsMaterial({
+            color: 0x5555ff,
+            size: 0.1,
+            transparent: true,
+            opacity: 0.6,
+            blending: THREE.AdditiveBlending
+        });
+        const particles = new THREE.Points(pGeo, pMat);
+        scene.add(particles);
+
+        // --- ANIMATION LOOP ---
+        let mouseX = 0, mouseY = 0;
+        document.addEventListener('mousemove', (e) => {
+            mouseX = (e.clientX - window.innerWidth/2) * 0.001;
+            mouseY = (e.clientY - window.innerHeight/2) * 0.001;
+        });
+
+        const clock = new THREE.Clock();
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const t = clock.getElapsedTime();
+
+            // Main Knot - Complex Rotation
+            torusKnot.rotation.y = t * 0.2;
+            torusKnot.rotation.z = t * 0.1;
+            
+            // Pulse Effect
+            const pulse = 1 + Math.sin(t * 2) * 0.05;
+            torusKnot.scale.set(pulse, pulse, pulse);
+
+            // Ring - Counter Rotate
+            orbitalRing.rotation.z = -t * 0.15;
+            orbitalRing.rotation.x = (Math.PI / 2) + Math.sin(t) * 0.1;
+
+            // Particles - Slow Drift + Color shift simulation
+            particles.rotation.y = t * 0.05;
+            
+            // Camera Parallax
+            camera.position.x += (mouseX * 10 - camera.position.x) * 0.05;
+            camera.position.y += (-mouseY * 10 - camera.position.y) * 0.05;
+            camera.lookAt(scene.position);
+
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        // Handle Resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            resizeChart();
+        });
+
+
+        // --- CHART VISUALIZER ---
+        const cvs = document.getElementById('chart-canvas');
+        const ctx = cvs.getContext('2d');
+        let cw, ch;
+
+        function resizeChart() {
+            cvs.width = cvs.offsetWidth;
+            cvs.height = cvs.offsetHeight;
+            cw = cvs.width;
+            ch = cvs.height;
+        }
+        resizeChart();
+
+        const bars = Array(50).fill(0).map(() => Math.random());
+
+        function drawChart() {
+            ctx.clearRect(0, 0, cw, ch);
+            const gap = 2;
+            const w = (cw / bars.length) - gap;
+
+            bars.forEach((bar, i) => {
+                // Jitter
+                bars[i] = Math.max(0.1, Math.min(1, bars[i] + (Math.random() - 0.5) * 0.2));
+                
+                const h = bars[i] * ch;
+                const x = i * (w + gap);
+                const y = ch - h;
+
+                const grad = ctx.createLinearGradient(0, ch, 0, 0);
+                grad.addColorStop(0, '#00ffcc');
+                grad.addColorStop(1, 'rgba(0, 255, 204, 0)');
+
+                ctx.fillStyle = grad;
+                ctx.fillRect(x, y, w, h);
+            });
+            requestAnimationFrame(drawChart);
+        }
+        drawChart();
+
+
+        // --- LOGIC & PROGRESS ---
+        const logEl = document.getElementById('terminal-log');
+        const pctEl = document.getElementById('percentage');
+        const progEl = document.getElementById('main-progress');
+        const txtEl = document.getElementById('loading-text');
+
+        const sysLogs = [
+            "Initializing secure boot...",
+            "Loading Kernel v2.4.0...",
+            "Mounting file system (Read-Only)...",
+            "Starting Python subsystem...",
+            "TensorFlow GPU delegate: ENABLED",
+            "Connecting to neural database...",
+            "Verifying biometrics...",
+            "Optimizing UI shaders...",
+            "Hydrating state management...",
+            "Launching main process..."
+        ];
+
+        let logIdx = 0;
+        function addLog(msg) {
+            const row = document.createElement('div');
+            const time = new Date().toISOString().split('T')[1].slice(0,8);
+            row.innerHTML = `<span class="text-gray-600">[${time}]</span> <span class="text-cyan-500">>></span> ${msg}`;
+            logEl.appendChild(row);
+            if(logEl.children.length > 7) logEl.removeChild(logEl.firstChild);
+        }
+
+        // Generate Random ID
+        document.getElementById('uid-hash').innerText = `ID: 8X-${Math.floor(Math.random()*900)+100}-ALPHA`;
+
+        let progress = { val: 0 };
+
+        gsap.to(progress, {
+            val: 100,
+            duration: LOADING_DURATION / 1000,
+            ease: "power2.inOut",
+            onUpdate: function() {
+                const cur = Math.floor(progress.val);
+                pctEl.innerText = cur;
+                progEl.style.width = cur + "%";
+
+                // Text States
+                if(cur < 30) txtEl.innerText = "INITIALIZING KERNEL...";
+                else if(cur < 60) txtEl.innerText = "LOADING ASSETS...";
+                else if(cur < 90) txtEl.innerText = "ESTABLISHING UPLINK...";
+                else txtEl.innerText = "FINALIZING...";
+
+                // Logs
+                if(cur % 10 === 0 && logIdx < sysLogs.length) {
+                    addLog(sysLogs[logIdx++]);
+                }
+            },
+            onComplete: function() {
+                // Success Sequence
+                const tl = gsap.timeline();
+                
+                // 1. Show Access Granted
+                tl.to('#access-overlay', { opacity: 1, scale: 1, duration: 0.3, ease: "back.out(1.7)" })
+                // 2. Fade out UI
+                  .to('.ui-layer', { opacity: 0, duration: 0.5 }, "+=0.5")
+                // 3. Zoom into 3D
+                  .to('#canvas-container', { scale: 2, opacity: 0, duration: 0.8, ease: "power2.in" })
+                // 4. Redirect
+                  .call(() => {
+                      console.log("Redirecting...");
+                      try {
+                          window.location.replace(NEXT_PAGE);
+                      } catch(e) {
+                          console.log("Preview mode fallback");
+                          document.body.innerHTML = `<div class="flex h-screen w-full items-center justify-center bg-black text-green-500 font-mono text-xl">SIMULATION COMPLETE<br>Redirecting to index.html</div>`;
+                      }
+                  });
+            }
+        });
+
+        addLog("Power on self-test passed.");
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ScanMyBhojan - App Dashboard</title>
+    
+    <!-- TAILWIND CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- FONTS -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@300;500;700&display=swap" rel="stylesheet">
+    
+    <!-- LIBRARIES -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        display: ['Space Grotesk', 'sans-serif'],
+                    },
+                    colors: {
+                        'tech-cyan': '#06b6d4',
+                        'tech-dark': '#0f172a',
+                        'slate-body': '#f8fafc'
+                    },
+                    animation: {
+                        'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'scan-down': 'scanDown 2s ease-in-out infinite',
+                        'fade-in-up': 'fadeInUp 0.5s ease-out forwards',
+                    },
+                    keyframes: {
+                        scanDown: {
+                            '0%': { top: '0%', opacity: 0 },
+                            '10%': { opacity: 1 },
+                            '90%': { opacity: 1 },
+                            '100%': { top: '100%', opacity: 0 },
+                        },
+                        fadeInUp: {
+                            '0%': { opacity: 0, transform: 'translateY(10px)' },
+                            '100%': { opacity: 1, transform: 'translateY(0)' }
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            background-color: #f8fafc;
+            color: #1e293b;
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+            user-select: none;
+        }
+
+        /* GLASSMORPHISM */
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.75);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid rgba(255, 255, 255, 0.9);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 10px 15px -3px rgba(0, 0, 0, 0.05);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .glass-panel:hover {
+            background: rgba(255, 255, 255, 0.95);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .nav-item {
+            transition: all 0.2s ease;
+            position: relative;
+        }
+        .nav-item.active {
+            background: #e0f2fe;
+            color: #0891b2;
+            font-weight: 600;
+        }
+        .nav-item:hover:not(.active) {
+            background: rgba(255,255,255,0.6);
+            color: #06b6d4;
+        }
+
+        /* UPLOAD ZONE */
+        .drop-zone {
+            background: repeating-linear-gradient(45deg, rgba(6, 182, 212, 0.02) 0, rgba(6, 182, 212, 0.02) 10px, transparent 10px, transparent 20px);
+            border: 2px dashed #cbd5e1;
+            transition: all 0.3s ease;
+        }
+        .drop-zone.active {
+            border-color: #06b6d4;
+            background: rgba(6, 182, 212, 0.05);
+            transform: scale(0.99);
+        }
+
+        /* CUSTOM SCROLLBAR */
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        /* SCANNER LINE */
+        .scanner-line {
+            height: 2px;
+            background: #06b6d4;
+            box-shadow: 0 0 15px #06b6d4;
+            position: absolute;
+            width: 100%;
+            z-index: 20;
+        }
+
+        /* GRID BG */
+        .bg-grid {
+            position: fixed; inset: 0; pointer-events: none; z-index: -1;
+            background-size: 40px 40px;
+            background-image: linear-gradient(to right, rgba(0, 0, 0, 0.03) 1px, transparent 1px),
+                              linear-gradient(to bottom, rgba(0, 0, 0, 0.03) 1px, transparent 1px);
+        }
+        
+        /* TOAST ANIMATION */
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        .toast-enter { animation: slideIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+    </style>
+</head>
+<body class="flex flex-col md:flex-row font-sans">
+
+    <!-- 3D BACKGROUND -->
+    <canvas id="bg-canvas" class="fixed inset-0 z-[-2] opacity-50"></canvas>
+    <div class="bg-grid"></div>
+
+    <!-- SIDEBAR -->
+    <aside class="w-full md:w-20 lg:w-64 h-16 md:h-full glass-panel z-50 flex flex-row md:flex-col justify-between border-b md:border-r border-white flex-shrink-0 relative">
+        <div class="h-16 md:h-24 flex items-center justify-center md:justify-start md:px-6 cursor-pointer" onclick="window.location.href='index.html'">
+            <i data-lucide="scan-line" class="text-tech-cyan w-8 h-8"></i>
+            <span class="hidden lg:block ml-3 font-display font-bold text-xl text-slate-800">ScanMy<span class="text-tech-cyan">Bhojan</span></span>
+        </div>
+
+        <nav class="flex-1 flex flex-row md:flex-col items-center md:items-stretch justify-center md:justify-start gap-1 md:gap-3 px-2 md:py-8">
+            <button class="nav-item active flex items-center gap-3 px-4 py-3 rounded-xl text-slate-500 font-medium text-sm group shadow-sm">
+                <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
+                <span class="hidden lg:block">Dashboard</span>
+            </button>
+            <button onclick="window.location.href='game.html'" class="nav-item flex items-center gap-3 px-4 py-3 rounded-xl text-slate-500 font-medium text-sm group hover:shadow-sm">
+                <i data-lucide="box" class="w-5 h-5 group-hover:text-purple-500 transition-colors"></i>
+                <span class="hidden lg:block">3D Visualizer</span>
+            </button>
+            <button onclick="window.location.href='feedback.html'" class="nav-item flex items-center gap-3 px-4 py-3 rounded-xl text-slate-500 font-medium text-sm group hover:shadow-sm">
+                <i data-lucide="message-square" class="w-5 h-5 group-hover:text-green-500 transition-colors"></i>
+                <span class="hidden lg:block">Feedback</span>
+            </button>
+        </nav>
+
+        <div class="hidden md:flex p-4 border-t border-slate-200/50">
+            <div class="flex items-center gap-3 w-full p-2 rounded-xl hover:bg-white/60 cursor-pointer transition-colors border border-transparent hover:border-slate-100">
+                <div class="w-9 h-9 rounded-full bg-gradient-to-tr from-cyan-400 to-blue-500 shadow-md ring-2 ring-white"></div>
+                <div class="hidden lg:block">
+                    <p class="text-xs font-bold text-slate-800">Demo User</p>
+                    <p class="text-[10px] text-slate-500 font-medium">Premium Plan</p>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <main class="flex-1 relative flex flex-col h-[calc(100vh-64px)] md:h-full overflow-hidden z-10">
+        
+        <!-- HEADER -->
+        <header class="h-16 md:h-20 flex items-center justify-between px-6 md:px-8 bg-white/40 backdrop-blur-md z-40 border-b border-white/50 sticky top-0">
+            <div>
+                <h1 class="text-2xl font-display font-bold text-slate-800 tracking-tight">Nutrition Scanner</h1>
+                <p class="text-xs text-slate-500 font-medium font-mono mt-0.5">AI ENGINE V2.5 • <span class="text-green-600">READY</span></p>
+            </div>
+            <div class="flex gap-3">
+                 <!-- UPDATED: Light Theme Button -->
+                 <button onclick="generateReport()" class="hidden md:flex items-center gap-2 px-4 py-2 bg-white text-slate-700 hover:text-tech-cyan border border-slate-200 hover:border-cyan-300 rounded-lg transition-all shadow-sm hover:shadow-md transform hover:-translate-y-0.5">
+                    <i data-lucide="file-text" class="w-4 h-4"></i>
+                    <span class="font-bold text-xs tracking-wide">Generate Report</span>
+                </button>
+                <div class="glass-panel px-3 py-1.5 rounded-full flex items-center gap-2 border-green-200/50">
+                    <div class="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)] animate-pulse"></div>
+                    <span class="text-[10px] font-bold text-green-700 tracking-wider">ONLINE</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- DYNAMIC CONTENT -->
+        <div class="flex-1 relative p-4 md:p-8 overflow-y-auto">
+            
+            <!-- VIEW 1: UPLOAD (Default) -->
+            <div id="uploadView" class="absolute inset-0 z-30 flex flex-col items-center justify-center p-4 transition-all duration-500 bg-slate-50/50 backdrop-blur-sm">
+                <div class="w-full max-w-4xl glass-panel rounded-[2.5rem] p-2 shadow-2xl shadow-cyan-900/5 relative overflow-hidden group">
+                    <div class="drop-zone relative rounded-[2rem] h-[500px] flex flex-col items-center justify-center text-center p-8 cursor-pointer group-hover:bg-cyan-50/30 transition-colors" id="dropZone">
+                        <div class="w-24 h-24 rounded-full bg-gradient-to-tr from-cyan-50 to-white flex items-center justify-center mb-6 shadow-lg shadow-cyan-100 group-hover:scale-110 transition-transform duration-300 ring-1 ring-cyan-100">
+                            <i data-lucide="scan-line" class="w-10 h-10 text-tech-cyan"></i>
+                        </div>
+                        <h2 class="text-4xl font-display font-bold text-slate-800 mb-3">Scan Your Meal</h2>
+                        <p class="text-slate-500 mb-8 max-w-md text-lg leading-relaxed">Drag & drop or click to upload. <br><span class="text-sm opacity-70">Supports JPG, PNG, WEBP</span></p>
+                        <button class="px-8 py-3.5 bg-slate-900 text-white font-bold rounded-xl hover:bg-tech-cyan transition-all flex items-center gap-2 shadow-xl shadow-slate-300">
+                            <i data-lucide="upload-cloud" class="w-5 h-5"></i> Select Image
+                        </button>
+                        <input type="file" id="fileInput" class="hidden" accept="image/*">
+                    </div>
+                </div>
+
+                <!-- Quick Actions -->
+                <div class="mt-8 flex flex-wrap justify-center gap-3 animate-fade-in-up">
+                    <span class="w-full text-center text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Quick Load Presets</span>
+                    <button onclick="quickLoad('apple')" class="glass-panel px-4 py-2.5 rounded-xl text-xs font-bold text-slate-600 hover:text-tech-cyan hover:border-cyan-200 transition-all flex items-center gap-2">
+                        <i data-lucide="apple" class="w-3 h-3 text-red-400"></i> Apple
+                    </button>
+                    <button onclick="quickLoad('salad')" class="glass-panel px-4 py-2.5 rounded-xl text-xs font-bold text-slate-600 hover:text-tech-cyan hover:border-cyan-200 transition-all flex items-center gap-2">
+                        <i data-lucide="leaf" class="w-3 h-3 text-green-500"></i> Salad
+                    </button>
+                    <button onclick="quickLoad('burger')" class="glass-panel px-4 py-2.5 rounded-xl text-xs font-bold text-slate-600 hover:text-tech-cyan hover:border-cyan-200 transition-all flex items-center gap-2">
+                        <i data-lucide="utensils" class="w-3 h-3 text-orange-400"></i> Burger
+                    </button>
+                     <button onclick="quickLoad('banana')" class="glass-panel px-4 py-2.5 rounded-xl text-xs font-bold text-slate-600 hover:text-tech-cyan hover:border-cyan-200 transition-all flex items-center gap-2">
+                        <i data-lucide="banana" class="w-3 h-3 text-yellow-500"></i> Banana
+                    </button>
+                     <button onclick="quickLoad('cake')" class="glass-panel px-4 py-2.5 rounded-xl text-xs font-bold text-slate-600 hover:text-tech-cyan hover:border-cyan-200 transition-all flex items-center gap-2">
+                        <i data-lucide="cake" class="w-3 h-3 text-pink-400"></i> Cake
+                    </button>
+                </div>
+            </div>
+
+            <!-- VIEW 2: SCANNING (Overlay) -->
+            <div id="scanningOverlay" class="absolute inset-0 z-40 bg-slate-100/90 backdrop-blur-2xl hidden flex-col items-center justify-center">
+                <div class="relative w-[320px] h-[320px] md:w-[420px] md:h-[420px] glass-panel rounded-3xl overflow-hidden shadow-2xl p-2 border-2 border-white">
+                    <div class="relative w-full h-full rounded-2xl overflow-hidden bg-slate-900">
+                        <img id="scanPreviewImg" class="w-full h-full object-cover opacity-80">
+                        <div class="absolute inset-0 bg-cyan-500/10 z-10"></div>
+                        <div class="scanner-line animate-scan-down shadow-[0_0_20px_#06b6d4]"></div>
+                        
+                        <!-- HUD Elements -->
+                        <div class="absolute top-6 left-6 w-8 h-8 border-t-2 border-l-2 border-cyan-400 rounded-tl-lg z-20"></div>
+                        <div class="absolute top-6 right-6 w-8 h-8 border-t-2 border-r-2 border-cyan-400 rounded-tr-lg z-20"></div>
+                        <div class="absolute bottom-6 left-6 w-8 h-8 border-b-2 border-l-2 border-cyan-400 rounded-bl-lg z-20"></div>
+                        <div class="absolute bottom-6 right-6 w-8 h-8 border-b-2 border-r-2 border-cyan-400 rounded-br-lg z-20"></div>
+                        
+                        <div class="absolute inset-0 flex items-center justify-center z-30">
+                            <i data-lucide="crosshair" class="w-12 h-12 text-cyan-400/50"></i>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mt-8 text-center">
+                    <h3 class="text-3xl font-display font-bold text-slate-800 mb-2">Analyzing...</h3>
+                    <div class="flex items-center justify-center gap-2 text-tech-cyan font-mono text-sm bg-white/50 px-4 py-1.5 rounded-full border border-cyan-100">
+                        <span class="animate-spin"><i data-lucide="loader-2" class="w-3.5 h-3.5"></i></span>
+                        <span id="scanStatus" class="tracking-wide uppercase text-[10px] font-bold">Initializing Neural Net</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW 3: RESULTS DASHBOARD -->
+            <div id="dashboardView" class="hidden flex-col gap-6 pb-24">
+                
+                <!-- Row 1: Main Stats -->
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 auto-rows-min">
+                    <!-- Image Card -->
+                    <div class="lg:col-span-4 glass-panel p-5 rounded-3xl flex flex-col h-full min-h-[420px]">
+                        <div class="relative h-64 rounded-2xl overflow-hidden mb-5 group shadow-md">
+                            <img id="resImg" class="w-full h-full object-cover absolute inset-0 transition-transform duration-700 group-hover:scale-105">
+                            <div class="absolute top-3 right-3 bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-lg text-[10px] font-bold text-white shadow-lg border border-white/10 z-10 flex items-center gap-1">
+                                <i data-lucide="check-circle" class="w-3 h-3 text-green-400"></i> AI VERIFIED
+                            </div>
+                        </div>
+                        
+                        <div class="flex-1 flex flex-col">
+                            <div class="flex items-start justify-between">
+                                <h2 id="resName" class="text-3xl font-display font-bold text-slate-800 leading-tight">Food Name</h2>
+                                <div id="giBadge" class="bg-slate-100 px-2 py-1 rounded text-[10px] font-bold text-slate-500 border border-slate-200">GI: --</div>
+                            </div>
+                            
+                            <!-- Smart Tags -->
+                            <div id="resTags" class="flex flex-wrap gap-2 mt-3 mb-2">
+                                <!-- Populated by JS -->
+                            </div>
+
+                            <p id="resDesc" class="text-sm text-slate-500 leading-relaxed mt-2 line-clamp-3">Description...</p>
+                            
+                            <div class="flex gap-3 mt-auto pt-5">
+                                <button onclick="window.location.href='game.html'" class="flex-1 py-3 bg-slate-900 text-white rounded-xl font-bold hover:bg-tech-cyan transition-all flex items-center justify-center gap-2 text-sm shadow-lg shadow-slate-300">
+                                    <i data-lucide="box" class="w-4 h-4"></i> 3D View
+                                </button>
+                                <button onclick="window.location.href='feedback.html'" class="px-4 py-3 glass-panel rounded-xl text-slate-500 hover:text-tech-cyan hover:bg-white transition-colors border border-transparent hover:border-cyan-200">
+                                    <i data-lucide="thumbs-up" class="w-4 h-4"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Macro Charts -->
+                    <div class="lg:col-span-5 glass-panel p-6 rounded-3xl flex flex-col h-full min-h-[420px]">
+                        <div class="flex justify-between items-center mb-2">
+                            <div>
+                                <h3 class="font-display font-bold text-lg text-slate-800">Macronutrients</h3>
+                                <p class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Distribution per Serving</p>
+                            </div>
+                            <button class="text-slate-400 hover:text-tech-cyan"><i data-lucide="info" class="w-4 h-4"></i></button>
+                        </div>
+                        
+                        <div class="flex-1 flex flex-col items-center justify-center py-4">
+                            <!-- Doughnut Chart -->
+                            <div class="relative w-56 h-56 mb-6">
+                                <canvas id="macroChart"></canvas>
+                                <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                                    <span id="resCals" class="text-4xl font-display font-bold text-slate-800 tracking-tighter">0</span>
+                                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">kcal</span>
+                                </div>
+                            </div>
+                            
+                            <!-- Legend / Bars -->
+                            <div class="w-full grid grid-cols-3 gap-4">
+                                <div class="bg-blue-50/50 p-3 rounded-xl border border-blue-100">
+                                    <div class="text-[10px] font-bold text-slate-500 uppercase mb-1">Protein</div>
+                                    <div class="text-lg font-bold text-blue-600 mb-2" id="valP">0g</div>
+                                    <div class="h-1.5 bg-blue-100 rounded-full overflow-hidden">
+                                        <div id="barP" class="h-full bg-blue-500 rounded-full" style="width: 0%"></div>
+                                    </div>
+                                </div>
+                                <div class="bg-orange-50/50 p-3 rounded-xl border border-orange-100">
+                                    <div class="text-[10px] font-bold text-slate-500 uppercase mb-1">Carbs</div>
+                                    <div class="text-lg font-bold text-orange-500 mb-2" id="valC">0g</div>
+                                    <div class="h-1.5 bg-orange-100 rounded-full overflow-hidden">
+                                        <div id="barC" class="h-full bg-orange-500 rounded-full" style="width: 0%"></div>
+                                    </div>
+                                </div>
+                                <div class="bg-rose-50/50 p-3 rounded-xl border border-rose-100">
+                                    <div class="text-[10px] font-bold text-slate-500 uppercase mb-1">Fats</div>
+                                    <div class="text-lg font-bold text-rose-500 mb-2" id="valF">0g</div>
+                                    <div class="h-1.5 bg-rose-100 rounded-full overflow-hidden">
+                                        <div id="barF" class="h-full bg-rose-500 rounded-full" style="width: 0%"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Health Score & Burn -->
+                    <div class="lg:col-span-3 flex flex-col gap-6 h-full min-h-[420px]">
+                        <!-- Score Card -->
+                        <div class="flex-1 glass-panel p-6 rounded-3xl flex flex-col items-center justify-center text-center relative overflow-hidden bg-gradient-to-b from-white to-green-50/50 border-t-4 border-t-green-400">
+                            <h3 class="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-4">Overall Health Score</h3>
+                            <div class="relative w-36 h-36 flex-shrink-0 mb-2">
+                                <canvas id="scoreChart"></canvas>
+                                <div class="absolute inset-0 flex items-center justify-center">
+                                    <span id="resScore" class="text-5xl font-display font-bold text-slate-800 tracking-tighter">0</span>
+                                </div>
+                            </div>
+                            <p id="scoreText" class="text-xs font-bold text-green-700 bg-green-100 px-4 py-1.5 rounded-full uppercase tracking-wide">Excellent</p>
+                        </div>
+                        
+                        <!-- Burn Metric -->
+                        <div class="glass-panel p-5 rounded-3xl flex flex-col justify-center gap-2 min-h-[140px] bg-gradient-to-br from-orange-50 to-white border-l-4 border-l-orange-400">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Energy Cost</p>
+                                    <div class="text-3xl font-display font-bold text-slate-800 mt-1"><span id="burnTime">0</span> <span class="text-lg text-slate-500 font-sans">min</span></div>
+                                    <p class="text-xs text-slate-500 mt-1 font-medium">Walking required to burn</p>
+                                </div>
+                                <div class="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center text-orange-500 shadow-sm">
+                                    <i data-lucide="footprints" class="w-5 h-5"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Row 2: Micro-nutrients & Insights -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 min-h-[350px]">
+                    <!-- Radar Chart -->
+                    <div class="glass-panel p-6 rounded-3xl relative flex flex-col">
+                        <div class="flex justify-between items-start mb-2">
+                            <div>
+                                <h3 class="font-display font-bold text-lg text-slate-800">Micronutrient Profile</h3>
+                                <p class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Target vs Actual</p>
+                            </div>
+                            <!-- Legend -->
+                            <div class="flex gap-3 text-[10px] font-bold uppercase">
+                                <div class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-cyan-400"></span> Actual</div>
+                                <div class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-slate-300"></span> Target</div>
+                            </div>
+                        </div>
+                        <div class="flex-1 w-full h-full min-h-[280px] relative p-2">
+                            <canvas id="radarChart"></canvas>
+                        </div>
+                    </div>
+                    
+                    <!-- UPDATED: AI Insights (Now Light Theme) -->
+                    <div class="glass-panel p-6 rounded-3xl flex flex-col h-full relative overflow-hidden bg-gradient-to-br from-white to-slate-50 border-white">
+                        
+                        <div class="flex items-center justify-between mb-6 z-10">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-xl bg-cyan-50 flex items-center justify-center text-cyan-500 border border-cyan-100 shadow-sm">
+                                    <i data-lucide="sparkles" class="w-5 h-5"></i>
+                                </div>
+                                <div>
+                                    <h3 class="font-display font-bold text-lg text-slate-800">AI Dietician</h3>
+                                    <p class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Real-time Analysis</p>
+                                </div>
+                            </div>
+                            <!-- Hydration Badge (Light Theme) -->
+                            <div class="flex flex-col items-end">
+                                <span class="text-[10px] text-slate-400 font-bold uppercase mb-1">Water Content</span>
+                                <div class="flex items-center gap-1.5 bg-cyan-50 px-2.5 py-1 rounded-lg border border-cyan-100">
+                                    <i data-lucide="droplets" class="w-3 h-3 text-cyan-500"></i>
+                                    <span class="text-xs font-bold text-cyan-700" id="waterContent">--%</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="flex-1 overflow-y-auto space-y-3 pr-2 z-10 custom-scrollbar" id="aiLog">
+                            <!-- Populated by JS -->
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+        
+        <!-- Generate Report Toast Container -->
+        <div id="toastContainer" class="fixed bottom-8 right-8 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+    </main>
+
+    <script>
+        // --- CONFIG ---
+        lucide.createIcons();
+        
+        // --- DATABASE ---
+        const DB = {
+            'apple': {
+                name: 'Fresh Red Apple',
+                cals: 95,
+                macros: { p: 1, c: 25, f: 0 },
+                micros: [80, 20, 10, 40, 60], // Vit C, Iron, Calc, Pot, Mag
+                targets: [90, 30, 20, 50, 40], // Comparison target
+                score: 94,
+                gi: 'Low (36)',
+                water: '86',
+                tags: ['High Fiber', 'Vegan', 'Gluten Free'],
+                desc: "A nutrient-dense fruit high in fiber and Vitamin C. Great for quick energy and digestion.",
+                ai: [
+                    "Excellent choice for pre-workout energy.",
+                    "High pectin content aids digestion.",
+                    "Sugar is natural fructose - comparison to processed sugar: Superior."
+                ]
+            },
+            'banana': {
+                name: 'Organic Banana',
+                cals: 105,
+                macros: { p: 1.3, c: 27, f: 0.3 },
+                micros: [15, 5, 2, 95, 30],
+                targets: [90, 30, 20, 50, 40],
+                score: 89,
+                gi: 'Med (51)',
+                water: '75',
+                tags: ['Potassium Rich', 'Vegan', 'Energy'],
+                desc: "Excellent source of potassium and quick carbs. Ideal pre-workout snack.",
+                ai: [
+                    "High potassium levels support muscle function.",
+                    "Rich in Vitamin B6 (20% DV).",
+                    "Digestible carbohydrates provide instant energy."
+                ]
+            },
+            'cake': {
+                name: 'Chocolate Truffle',
+                cals: 450,
+                macros: { p: 6, c: 55, f: 24 },
+                micros: [0, 10, 5, 15, 10], 
+                targets: [90, 30, 20, 50, 40],
+                score: 25,
+                gi: 'High (70+)',
+                water: '15',
+                tags: ['High Sugar', 'Processed', 'Dessert'],
+                desc: "High calorie desert item. Contains processed sugars and saturated fats.",
+                ai: [
+                    "Alert: Sugar spike imminent (>30g).",
+                    "Contains processed cocoa and refined flour.",
+                    "Suggestion: Limit portion size to 100g max."
+                ]
+            },
+            'burger': {
+                name: 'Double Cheeseburger',
+                cals: 850,
+                macros: { p: 45, c: 50, f: 55 },
+                micros: [10, 40, 30, 20, 10],
+                targets: [90, 30, 20, 50, 40],
+                score: 45,
+                gi: 'High (65)',
+                water: '40',
+                tags: ['High Protein', 'High Sodium', 'Fast Food'],
+                desc: "High protein but caloric dense. Contains significant saturated fats.",
+                ai: [
+                    "Warning: Sodium content exceeds 40% of daily value.",
+                    "Saturated fats detected. Suggest pairing with leafy greens.",
+                    "Protein quality is high, good for post-heavy lifting."
+                ]
+            },
+            'salad': {
+                name: 'Greek Garden Salad',
+                cals: 320,
+                macros: { p: 8, c: 12, f: 24 },
+                micros: [90, 60, 50, 40, 80],
+                targets: [90, 30, 20, 50, 40],
+                score: 88,
+                gi: 'Low (15)',
+                water: '92',
+                tags: ['Keto Friendly', 'Antioxidants', 'GF'],
+                desc: "Rich in healthy monounsaturated fats from olive oil and olives.",
+                ai: [
+                    "Excellent source of Vitamin K and antioxidants.",
+                    "Healthy fats promote nutrient absorption.",
+                    "Low glycemic load - safe for diabetic diets."
+                ]
+            },
+            'default': {
+                name: 'Generic Healthy Meal',
+                cals: 400,
+                macros: { p: 20, c: 40, f: 15 },
+                micros: [50, 50, 50, 50, 50],
+                targets: [50, 50, 50, 50, 50],
+                score: 75,
+                gi: 'Medium',
+                water: '60',
+                tags: ['Balanced', 'Lunch'],
+                desc: "Balanced meal detected. Good distribution of macronutrients.",
+                ai: [
+                    "Analysis confident but generic.",
+                    "Macronutrients appear balanced.",
+                    "Ensure adequate hydration with this meal."
+                ]
+            }
+        };
+
+        // --- ELEMENTS ---
+        const els = {
+            dropZone: document.getElementById('dropZone'),
+            fileInput: document.getElementById('fileInput'),
+            uploadView: document.getElementById('uploadView'),
+            scanView: document.getElementById('scanningOverlay'),
+            dashView: document.getElementById('dashboardView'),
+            scanImg: document.getElementById('scanPreviewImg'),
+            resImg: document.getElementById('resImg'),
+            status: document.getElementById('scanStatus'),
+            tags: document.getElementById('resTags')
+        };
+
+        let charts = {};
+
+        // --- HANDLERS ---
+        els.dropZone.addEventListener('click', () => els.fileInput.click());
+        els.fileInput.addEventListener('change', (e) => handleFile(e.target.files[0]));
+        
+        els.dropZone.addEventListener('dragover', (e) => { e.preventDefault(); els.dropZone.classList.add('active'); });
+        els.dropZone.addEventListener('dragleave', () => els.dropZone.classList.remove('active'));
+        els.dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            els.dropZone.classList.remove('active');
+            if(e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+        });
+
+        window.quickLoad = (key) => {
+            let url = "";
+            if(key === 'apple') url = "https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?w=600";
+            if(key === 'burger') url = "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=600";
+            if(key === 'salad') url = "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=600";
+            if(key === 'banana') url = "https://images.unsplash.com/photo-1571771896612-929c6304aa1e?w=600";
+            if(key === 'cake') url = "https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=600";
+            processScan(url, key);
+        };
+
+        function handleFile(file) {
+            if(!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                let key = 'default';
+                const lowerName = file.name.toLowerCase();
+                
+                if(lowerName.includes('burg')) key = 'burger';
+                else if(lowerName.includes('sal')) key = 'salad';
+                else if(lowerName.includes('ban')) key = 'banana';
+                else if(lowerName.includes('cake')) key = 'cake';
+                else if(lowerName.includes('app')) key = 'apple';
+                
+                processScan(e.target.result, key);
+            };
+            reader.readAsDataURL(file);
+        }
+
+        window.generateReport = () => {
+            const toastContainer = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = 'bg-white/90 backdrop-blur text-slate-800 px-6 py-4 rounded-xl border border-slate-200 font-mono text-xs shadow-2xl toast-enter flex items-center gap-4';
+            toast.innerHTML = `
+                <span class="animate-spin text-cyan-500"><i data-lucide="loader" class="w-4 h-4"></i></span>
+                <div>
+                    <div class="font-bold text-slate-800 mb-1">> Executing Report Module...</div>
+                    <div class="text-slate-500">Compiling charts & tables...</div>
+                </div>
+            `;
+            toastContainer.appendChild(toast);
+            lucide.createIcons();
+
+            setTimeout(() => {
+                toast.innerHTML = `
+                    <div class="bg-green-100 p-2 rounded-full"><i data-lucide="check" class="w-4 h-4 text-green-600"></i></div>
+                    <div>
+                        <div class="font-bold text-slate-800 mb-1">Success</div>
+                        <div class="text-slate-500">Analysis_Report_v2.pdf saved.</div>
+                    </div>
+                `;
+                lucide.createIcons();
+                setTimeout(() => toast.remove(), 4000);
+            }, 2500);
+        };
+
+        // --- MAIN LOGIC ---
+        function processScan(imgSrc, key) {
+            els.scanImg.src = imgSrc;
+            els.resImg.src = imgSrc;
+            
+            gsap.to(els.uploadView, { opacity: 0, scale: 0.98, duration: 0.4, onComplete: () => {
+                els.uploadView.style.display = 'none';
+                els.scanView.style.display = 'flex';
+                els.scanView.classList.remove('hidden');
+                gsap.from(els.scanView, { opacity: 0, duration: 0.5 });
+            }});
+
+            const stages = ["Calibrating Sensors...", "Spectroscopic Analysis...", "Measuring Density...", "Generating Insights..."];
+            let i = 0;
+            const interval = setInterval(() => {
+                if(i < stages.length) els.status.innerText = stages[i++];
+            }, 750);
+
+            setTimeout(() => {
+                clearInterval(interval);
+                showDashboard(DB[key] || DB['default']);
+            }, 3000);
+        }
+
+        function showDashboard(data) {
+            // Text Data
+            document.getElementById('resName').innerText = data.name;
+            document.getElementById('resDesc').innerText = data.desc;
+            document.getElementById('resCals').innerText = data.cals;
+            document.getElementById('resScore').innerText = data.score;
+            document.getElementById('valP').innerText = data.macros.p + "g";
+            document.getElementById('valC').innerText = data.macros.c + "g";
+            document.getElementById('valF').innerText = data.macros.f + "g";
+            document.getElementById('burnTime').innerText = Math.round(data.cals / 4);
+            document.getElementById('giBadge').innerText = "GI: " + data.gi;
+            document.getElementById('waterContent').innerText = data.water + "%";
+            
+            // Score Color Logic
+            const scoreText = document.getElementById('scoreText');
+            if(data.score < 50) { scoreText.className = "text-xs font-bold text-red-700 bg-red-100 px-4 py-1.5 rounded-full uppercase tracking-wide"; scoreText.innerText = "Poor"; }
+            else if(data.score < 80) { scoreText.className = "text-xs font-bold text-orange-700 bg-orange-100 px-4 py-1.5 rounded-full uppercase tracking-wide"; scoreText.innerText = "Moderate"; }
+            else { scoreText.className = "text-xs font-bold text-green-700 bg-green-100 px-4 py-1.5 rounded-full uppercase tracking-wide"; scoreText.innerText = "Excellent"; }
+
+            // Smart Tags
+            els.tags.innerHTML = "";
+            data.tags.forEach(tag => {
+                const span = document.createElement('span');
+                span.className = "px-2.5 py-1 rounded-md bg-slate-100 text-[10px] font-bold text-slate-600 border border-slate-200 uppercase tracking-wide";
+                span.innerText = tag;
+                els.tags.appendChild(span);
+            });
+
+            // Bars Animation
+            document.getElementById('barP').style.width = Math.min(data.macros.p*2, 100) + '%';
+            document.getElementById('barC').style.width = Math.min(data.macros.c*2, 100) + '%';
+            document.getElementById('barF').style.width = Math.min(data.macros.f*2, 100) + '%';
+
+            // AI Log (Updated for Light Theme)
+            const aiDiv = document.getElementById('aiLog');
+            aiDiv.innerHTML = '';
+            data.ai.forEach((text, idx) => {
+                setTimeout(() => {
+                    const p = document.createElement('div');
+                    p.className = "bg-slate-50 p-3 rounded-xl text-xs text-slate-600 border border-slate-100 flex gap-3 hover:bg-white hover:shadow-sm transition-all";
+                    p.innerHTML = `<i data-lucide="check-circle-2" class="w-3.5 h-3.5 text-cyan-500 flex-shrink-0 mt-0.5"></i> <span>${text}</span>`;
+                    aiDiv.appendChild(p);
+                    lucide.createIcons();
+                }, idx * 100);
+            });
+
+            // Reveal Dashboard
+            gsap.to(els.scanView, { opacity: 0, duration: 0.5, onComplete: () => {
+                els.scanView.style.display = 'none';
+                els.dashView.style.display = 'flex';
+                els.dashView.classList.remove('hidden');
+                gsap.from(els.dashView, { opacity: 0, y: 30, duration: 0.8, ease: "power2.out" });
+                renderCharts(data);
+            }});
+        }
+
+        function renderCharts(data) {
+            Chart.defaults.font.family = 'Inter';
+            Chart.defaults.color = '#64748b';
+
+            // 1. MACRO DOUGHNUT
+            const ctxMacro = document.getElementById('macroChart').getContext('2d');
+            if(charts.macro) charts.macro.destroy();
+            charts.macro = new Chart(ctxMacro, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Protein', 'Carbs', 'Fat'],
+                    datasets: [{
+                        data: [data.macros.p, data.macros.c, data.macros.f],
+                        backgroundColor: ['#3b82f6', '#f97316', '#f43f5e'],
+                        borderWidth: 0,
+                        hoverOffset: 15
+                    }]
+                },
+                options: { 
+                    cutout: '80%', 
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false }, tooltip: { backgroundColor: '#1e293b', padding: 12, cornerRadius: 8 } },
+                    animation: { animateScale: true, animateRotate: true }
+                }
+            });
+
+            // 2. SCORE GAUGE
+            const ctxScore = document.getElementById('scoreChart').getContext('2d');
+            if(charts.score) charts.score.destroy();
+            charts.score = new Chart(ctxScore, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Score', ''],
+                    datasets: [{
+                        data: [data.score, 100-data.score],
+                        backgroundColor: data.score > 80 ? ['#22c55e', '#f0fdf4'] : (data.score > 50 ? ['#f97316', '#fff7ed'] : ['#ef4444', '#fef2f2']),
+                        borderWidth: 0,
+                        circumference: 360,
+                        rotation: 0
+                    }]
+                },
+                options: { 
+                    cutout: '90%', 
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false }, tooltip: { enabled: false } },
+                    animation: { animateScale: true }
+                }
+            });
+
+            // 3. RADAR CHART (Advanced)
+            const ctxRadar = document.getElementById('radarChart').getContext('2d');
+            if(charts.radar) charts.radar.destroy();
+            
+            // Gradient fill
+            const gradient = ctxRadar.createLinearGradient(0, 0, 0, 400);
+            gradient.addColorStop(0, 'rgba(6, 182, 212, 0.4)');
+            gradient.addColorStop(1, 'rgba(6, 182, 212, 0.05)');
+
+            charts.radar = new Chart(ctxRadar, {
+                type: 'radar',
+                data: {
+                    labels: ['Vit C', 'Iron', 'Calc', 'Potas', 'Mag'],
+                    datasets: [
+                        {
+                            label: 'This Food',
+                            data: data.micros,
+                            backgroundColor: gradient,
+                            borderColor: '#06b6d4',
+                            borderWidth: 2,
+                            pointBackgroundColor: '#06b6d4',
+                            pointBorderColor: '#fff',
+                            pointHoverBackgroundColor: '#fff',
+                            pointHoverBorderColor: '#06b6d4'
+                        },
+                        {
+                            label: 'Daily Target',
+                            data: data.targets || [50,50,50,50,50], // Fallback
+                            backgroundColor: 'transparent',
+                            borderColor: '#cbd5e1',
+                            borderWidth: 1,
+                            borderDash: [4, 4],
+                            pointRadius: 0
+                        }
+                    ]
+                },
+                options: {
+                    maintainAspectRatio: false,
+                    scales: {
+                        r: {
+                            angleLines: { color: 'rgba(0,0,0,0.05)' },
+                            grid: { color: 'rgba(0,0,0,0.05)' },
+                            pointLabels: { font: { size: 10, weight: '600' }, color: '#64748b' },
+                            ticks: { display: false, max: 100 }
+                        }
+                    },
+                    plugins: { 
+                        legend: { display: false },
+                        tooltip: { backgroundColor: '#1e293b', titleFont: { family: 'Space Grotesk' } }
+                    },
+                    animation: { duration: 2000, easing: 'easeOutQuart' }
+                }
+            });
+        }
+
+        // --- 3D BACKGROUND ---
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('bg-canvas'), alpha: true, antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+        const geometry = new THREE.IcosahedronGeometry(6, 2);
+        const material = new THREE.MeshBasicMaterial({ color: 0x06b6d4, wireframe: true, transparent: true, opacity: 0.08 });
+        const sphere = new THREE.Mesh(geometry, material);
+        scene.add(sphere);
+
+        const coreGeo = new THREE.IcosahedronGeometry(4, 1);
+        const coreMat = new THREE.MeshBasicMaterial({ color: 0x10b981, wireframe: true, transparent: true, opacity: 0.05 });
+        const core = new THREE.Mesh(coreGeo, coreMat);
+        scene.add(core);
+
+        camera.position.z = 15;
+
+        let time = 0;
+        function animate() {
+            requestAnimationFrame(animate);
+            time += 0.001;
+            sphere.rotation.x = Math.sin(time) * 0.2;
+            sphere.rotation.y += 0.001;
+            core.rotation.x -= 0.001;
+            core.rotation.y -= 0.002;
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+    </script>
+</body>
+</html>
